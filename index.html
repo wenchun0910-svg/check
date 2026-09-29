@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>學生檔案繳交查詢系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3b82f6; 
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800 min-h-screen">
+
+<div class="max-w-5xl mx-auto px-4 py-8">
+    <header class="mb-8 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-4">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900">檔案繳交查詢系統</h1>
+            <p class="text-gray-500 mt-1">即時比對表單回應與學生名單</p>
+        </div>
+        
+        <div class="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
+            <label for="classSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap">查詢班級：</label>
+            <select id="classSelect" class="block w-full sm:w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" onchange="fetchData()">
+                <option value="">載入班級中...</option>
+            </select>
+        </div>
+    </header>
+
+    <div id="loadingIndicator" class="text-center py-12">
+        <div class="loader mr-2"></div>
+        <span class="text-lg text-gray-600 font-medium">資料處理中，請稍候...</span>
+    </div>
+
+    <div id="errorMessage" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md shadow-sm" role="alert">
+        <p class="font-bold">發生錯誤</p>
+        <p id="errorText"></p>
+    </div>
+
+    <div id="dataContainer" class="hidden">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center items-center">
+                <span class="text-sm text-gray-500 font-medium uppercase tracking-wider">應交總人數</span>
+                <span id="totalCount" class="text-3xl font-bold text-gray-900 mt-2">-</span>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-green-200 p-5 flex flex-col justify-center items-center border-t-4 border-t-green-500">
+                <span class="text-sm text-green-600 font-medium uppercase tracking-wider">已繳交</span>
+                <span id="submittedCount" class="text-3xl font-bold text-green-600 mt-2">-</span>
+            </div>
+            <div class="bg-white rounded-xl shadow-sm border border-red-200 p-5 flex flex-col justify-center items-center border-t-4 border-t-red-500">
+                <span class="text-sm text-red-600 font-medium uppercase tracking-wider">未繳交</span>
+                <span id="missingCount" class="text-3xl font-bold text-red-600 mt-2">-</span>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- 未繳交名單 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
+                <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-red-800 flex items-center gap-2">
+                        未繳交名單
+                    </h2>
+                    <span id="missingBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-red-200">0 人</span>
+                </div>
+                <div class="overflow-y-auto no-scrollbar flex-grow p-0">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班級</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">座號</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
+                            </tr>
+                        </thead>
+                        <tbody id="missingTableBody" class="bg-white divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 已繳交名單 -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
+                <div class="bg-green-50 px-6 py-4 border-b border-green-100 flex justify-between items-center">
+                    <h2 class="text-lg font-semibold text-green-800 flex items-center gap-2">
+                        已繳交名單
+                    </h2>
+                    <span id="submittedBadge" class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-green-200">0 人</span>
+                </div>
+                <div class="overflow-y-auto no-scrollbar flex-grow p-0">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班級</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">座號</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">檔案</th>
+                            </tr>
+                        </thead>
+                        <tbody id="submittedTableBody" class="bg-white divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // ⚠️ 請將下方的 URL 替換為你的 Apps Script 網頁應用程式網址！
+    const SCRIPT_URL = '請貼上你的_APPS_SCRIPT_網頁應用程式網址'; 
+
+    document.addEventListener('DOMContentLoaded', initializeApp);
+
+    async function initializeApp() {
+        if (SCRIPT_URL === '請貼上你的_APPS_SCRIPT_網頁應用程式網址') {
+            showError('尚未設定 SCRIPT_URL。請先在 index.html 檔案中填寫 Apps Script 網址。');
+            return;
+        }
+
+        try {
+            // 使用 Fetch 呼叫後端 API 取得班級列表
+            const response = await fetch(`${SCRIPT_URL}?action=getClasses`);
+            const result = await response.json();
+
+            if (result.success) {
+                populateClassSelect(result.data);
+            } else {
+                showError(result.error);
+            }
+        } catch (error) {
+            showError('無法連線到伺服器 (CORS 或網址錯誤)。請確認 Apps Script 權限已設為「所有人」。');
+        }
+    }
+
+    function populateClassSelect(classes) {
+        const select = document.getElementById('classSelect');
+        select.innerHTML = '<option value="全部">全部班級</option>'; 
+        
+        classes.forEach(cls => {
+            const option = document.createElement('option');
+            option.value = cls;
+            option.textContent = cls;
+            select.appendChild(option);
+        });
+        fetchData();
+    }
+
+    async function fetchData() {
+        const selectedClass = document.getElementById('classSelect').value;
+        
+        document.getElementById('loadingIndicator').classList.remove('hidden');
+        document.getElementById('dataContainer').classList.add('hidden');
+        document.getElementById('errorMessage').classList.add('hidden');
+
+        try {
+            // 使用 Fetch 呼叫後端 API 取得指定班級的狀態
+            const response = await fetch(`${SCRIPT_URL}?action=getStatus&targetClass=${encodeURIComponent(selectedClass)}`);
+            const result = await response.json();
+
+            if (result.success) {
+                updateUI(result.data);
+            } else {
+                showError(result.error);
+            }
+        } catch (error) {
+            showError('獲取資料失敗，請稍後再試。');
+        }
+    }
+
+    function updateUI(data) {
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.getElementById('dataContainer').classList.remove('hidden');
+
+        const submitted = data.submitted;
+        const missing = data.missing;
+
+        const total = submitted.length + missing.length;
+        document.getElementById('totalCount').textContent = total;
+        document.getElementById('submittedCount').textContent = submitted.length;
+        document.getElementById('missingCount').textContent = missing.length;
+        
+        document.getElementById('submittedBadge').textContent = submitted.length + ' 人';
+        document.getElementById('missingBadge').textContent = missing.length + ' 人';
+
+        renderTable('missingTableBody', missing, false);
+        renderTable('submittedTableBody', submitted, true);
+    }
+
+    function renderTable(tbodyId, dataList, isSubmitted) {
+        const tbody = document.getElementById(tbodyId);
+        tbody.innerHTML = ''; 
+
+        if (dataList.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="${isSubmitted ? 4 : 3}" class="px-6 py-10 text-center text-sm text-gray-500">無符合的資料</td></tr>`;
+            return;
+        }
+
+        dataList.forEach(student => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 transition-colors duration-150';
+            
+            let rowHtml = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.class}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.seat}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${student.name}</td>
+            `;
+
+            if (isSubmitted) {
+                let fileLinkHtml = '<span class="text-xs text-gray-400 italic">無連結</span>';
+                if (student.fileUrl && student.fileUrl.toString().includes('http')) {
+                    const urls = student.fileUrl.toString().split(',');
+                    fileLinkHtml = urls.map((url, index) => `<a href="${url.trim()}" target="_blank" class="inline-flex items-center text-blue-600 hover:underline text-sm mr-2 mb-1">查看檔案 ${urls.length > 1 ? index + 1 : ''}</a>`).join('');
+                } else if (student.fileUrl) {
+                     fileLinkHtml = `<span class="text-sm text-gray-600">${student.fileUrl}</span>`;
+                }
+                rowHtml += `<td class="px-6 py-4 whitespace-nowrap">${fileLinkHtml}</td>`;
+            }
+
+            tr.innerHTML = rowHtml;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function showError(errorMsg) {
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.getElementById('dataContainer').classList.add('hidden');
+        document.getElementById('errorMessage').classList.remove('hidden');
+        document.getElementById('errorText').textContent = errorMsg;
+    }
+</script>
+</body>
+</html>
