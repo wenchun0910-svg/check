@@ -3,241 +3,159 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>學生檔案繳交查詢系統</title>
+    <title>檔案繳交查詢系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3b82f6; 
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-        }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-    </style>
 </head>
-<body class="bg-gray-50 text-gray-800 min-h-screen">
+<body class="bg-gray-50 text-gray-800 font-sans p-4 md:p-8">
 
-<div class="max-w-5xl mx-auto px-4 py-8">
-    <header class="mb-8 text-center sm:text-left flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div>
-            <h1 class="text-3xl font-bold text-gray-900">檔案繳交查詢系統</h1>
-            <p class="text-gray-500 mt-1">即時比對表單回應與學生名單</p>
-        </div>
+    <div class="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-6">
+        <h1 class="text-2xl font-bold text-center mb-6 text-blue-600">檔案繳交查詢系統</h1>
         
-        <div class="flex items-center gap-2 bg-white p-2 rounded-lg shadow-sm border border-gray-200">
-            <label for="classSelect" class="text-sm font-medium text-gray-700 whitespace-nowrap">查詢班級：</label>
-            <select id="classSelect" class="block w-full sm:w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" onchange="fetchData()">
-                <option value="">載入班級中...</option>
-            </select>
-        </div>
-    </header>
-
-    <div id="loadingIndicator" class="text-center py-12">
-        <div class="loader mr-2"></div>
-        <span class="text-lg text-gray-600 font-medium">資料處理中，請稍候...</span>
-    </div>
-
-    <div id="errorMessage" class="hidden bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6 rounded-md shadow-sm" role="alert">
-        <p class="font-bold">發生錯誤</p>
-        <p id="errorText"></p>
-    </div>
-
-    <div id="dataContainer" class="hidden">
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center items-center">
-                <span class="text-sm text-gray-500 font-medium uppercase tracking-wider">應交總人數</span>
-                <span id="totalCount" class="text-3xl font-bold text-gray-900 mt-2">-</span>
+        <!-- 控制面板 -->
+        <div class="flex flex-col md:flex-row items-center justify-between gap-4 mb-8 p-4 bg-blue-50 rounded-md border border-blue-100">
+            <div class="flex items-center gap-3 w-full md:w-auto">
+                <label for="classSelect" class="font-semibold whitespace-nowrap">選擇班級：</label>
+                <select id="classSelect" class="w-full md:w-48 p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:bg-gray-200" disabled>
+                    <option value="">載入班級中...</option>
+                </select>
             </div>
-            <div class="bg-white rounded-xl shadow-sm border border-green-200 p-5 flex flex-col justify-center items-center border-t-4 border-t-green-500">
-                <span class="text-sm text-green-600 font-medium uppercase tracking-wider">已繳交</span>
-                <span id="submittedCount" class="text-3xl font-bold text-green-600 mt-2">-</span>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border border-red-200 p-5 flex flex-col justify-center items-center border-t-4 border-t-red-500">
-                <span class="text-sm text-red-600 font-medium uppercase tracking-wider">未繳交</span>
-                <span id="missingCount" class="text-3xl font-bold text-red-600 mt-2">-</span>
-            </div>
+            <button id="queryBtn" onclick="queryData()" class="w-full md:w-auto px-6 py-2 bg-blue-500 text-white font-semibold rounded hover:bg-blue-600 disabled:bg-gray-400 transition-colors" disabled>
+                查詢繳交狀態
+            </button>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <!-- 未繳交名單 -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
-                <div class="bg-red-50 px-6 py-4 border-b border-red-100 flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-red-800 flex items-center gap-2">
-                        未繳交名單
-                    </h2>
-                    <span id="missingBadge" class="bg-red-100 text-red-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-red-200">0 人</span>
-                </div>
-                <div class="overflow-y-auto no-scrollbar flex-grow p-0">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班級</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">座號</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
-                            </tr>
-                        </thead>
-                        <tbody id="missingTableBody" class="bg-white divide-y divide-gray-100"></tbody>
-                    </table>
-                </div>
-            </div>
+        <!-- 狀態與提示訊息 -->
+        <div id="statusMessage" class="text-center font-medium my-4 text-gray-600">
+            請先等待班級列表載入完成。
+        </div>
 
-            <!-- 已繳交名單 -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-[600px]">
-                <div class="bg-green-50 px-6 py-4 border-b border-green-100 flex justify-between items-center">
-                    <h2 class="text-lg font-semibold text-green-800 flex items-center gap-2">
-                        已繳交名單
-                    </h2>
-                    <span id="submittedBadge" class="bg-green-100 text-green-800 text-xs font-semibold px-2.5 py-0.5 rounded-full border border-green-200">0 人</span>
-                </div>
-                <div class="overflow-y-auto no-scrollbar flex-grow p-0">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50 sticky top-0 z-10">
-                            <tr>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">班級</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">座號</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">姓名</th>
-                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">檔案</th>
-                            </tr>
-                        </thead>
-                        <tbody id="submittedTableBody" class="bg-white divide-y divide-gray-100"></tbody>
-                    </table>
-                </div>
-            </div>
+        <!-- 查詢結果表格 -->
+        <div class="overflow-x-auto hidden" id="resultContainer">
+            <table class="w-full text-left border-collapse">
+                <thead>
+                    <tr class="bg-gray-100 border-b-2 border-gray-300">
+                        <th class="p-3">座號</th>
+                        <th class="p-3">姓名</th>
+                        <th class="p-3 text-center">狀態</th>
+                        <th class="p-3 text-center">繳交時間</th>
+                        <th class="p-3 text-center">檔案</th>
+                    </tr>
+                </thead>
+                <tbody id="resultBody" class="divide-y divide-gray-200">
+                    <!-- 資料將透過 JS 動態產生 -->
+                </tbody>
+            </table>
         </div>
     </div>
-</div>
 
-<script>
-    // ⚠️ 請將下方的 URL 替換為你的 Apps Script 網頁應用程式網址！
-    const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRqQ3AKH-aaAwxsHgZOzmB1AepUUs9E8AwmXJqUwAiNgy-pC-PdY2fZIIP0uanJCFl/exec'; 
+    <script>
+        // ==========================================
+        // ⚠️ 請將下方的網址替換成您最新部署的 Apps Script 網址
+        // ==========================================
+        const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxRqQ3AKH-aaAwxsHgZOzmB1AepUUs9E8AwmXJqUwAiNgy-pC-PdY2fZIIP0uanJCFl/exec'; 
 
-    document.addEventListener('DOMContentLoaded', initializeApp);
+        const classSelect = document.getElementById('classSelect');
+        const queryBtn = document.getElementById('queryBtn');
+        const statusMessage = document.getElementById('statusMessage');
+        const resultContainer = document.getElementById('resultContainer');
+        const resultBody = document.getElementById('resultBody');
 
-    async function initializeApp() {
-        if (SCRIPT_URL === 'https://script.google.com/macros/s/AKfycbxRqQ3AKH-aaAwxsHgZOzmB1AepUUs9E8AwmXJqUwAiNgy-pC-PdY2fZIIP0uanJCFl/exec') {
-            showError('尚未設定 SCRIPT_URL。請先在 index.html 檔案中填寫 Apps Script 網址。');
-            return;
-        }
-
-        try {
-            // 使用 Fetch 呼叫後端 API 取得班級列表
-            const response = await fetch(`${SCRIPT_URL}?action=getClasses`);
-            const result = await response.json();
-
-            if (result.success) {
-                populateClassSelect(result.data);
-            } else {
-                showError(result.error);
+        // 頁面載入時，自動去後端抓取班級列表
+        window.onload = async function() {
+            if (SCRIPT_URL === '請貼上您的_Apps_Script_網址') {
+                statusMessage.innerHTML = '<span class="text-red-500">錯誤：請先在 HTML 檔案中設定 SCRIPT_URL 網址！</span>';
+                return;
             }
-        } catch (error) {
-            showError('無法連線到伺服器 (CORS 或網址錯誤)。請確認 Apps Script 權限已設為「所有人」。');
-        }
-    }
 
-    function populateClassSelect(classes) {
-        const select = document.getElementById('classSelect');
-        select.innerHTML = '<option value="全部">全部班級</option>'; 
-        
-        classes.forEach(cls => {
-            const option = document.createElement('option');
-            option.value = cls;
-            option.textContent = cls;
-            select.appendChild(option);
-        });
-        fetchData();
-    }
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=getClasses`);
+                const result = await response.json();
 
-    async function fetchData() {
-        const selectedClass = document.getElementById('classSelect').value;
-        
-        document.getElementById('loadingIndicator').classList.remove('hidden');
-        document.getElementById('dataContainer').classList.add('hidden');
-        document.getElementById('errorMessage').classList.add('hidden');
-
-        try {
-            // 使用 Fetch 呼叫後端 API 取得指定班級的狀態
-            const response = await fetch(`${SCRIPT_URL}?action=getStatus&targetClass=${encodeURIComponent(selectedClass)}`);
-            const result = await response.json();
-
-            if (result.success) {
-                updateUI(result.data);
-            } else {
-                showError(result.error);
-            }
-        } catch (error) {
-            showError('獲取資料失敗，請稍後再試。');
-        }
-    }
-
-    function updateUI(data) {
-        document.getElementById('loadingIndicator').classList.add('hidden');
-        document.getElementById('dataContainer').classList.remove('hidden');
-
-        const submitted = data.submitted;
-        const missing = data.missing;
-
-        const total = submitted.length + missing.length;
-        document.getElementById('totalCount').textContent = total;
-        document.getElementById('submittedCount').textContent = submitted.length;
-        document.getElementById('missingCount').textContent = missing.length;
-        
-        document.getElementById('submittedBadge').textContent = submitted.length + ' 人';
-        document.getElementById('missingBadge').textContent = missing.length + ' 人';
-
-        renderTable('missingTableBody', missing, false);
-        renderTable('submittedTableBody', submitted, true);
-    }
-
-    function renderTable(tbodyId, dataList, isSubmitted) {
-        const tbody = document.getElementById(tbodyId);
-        tbody.innerHTML = ''; 
-
-        if (dataList.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${isSubmitted ? 4 : 3}" class="px-6 py-10 text-center text-sm text-gray-500">無符合的資料</td></tr>`;
-            return;
-        }
-
-        dataList.forEach(student => {
-            const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50 transition-colors duration-150';
-            
-            let rowHtml = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${student.class}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${student.seat}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700">${student.name}</td>
-            `;
-
-            if (isSubmitted) {
-                let fileLinkHtml = '<span class="text-xs text-gray-400 italic">無連結</span>';
-                if (student.fileUrl && student.fileUrl.toString().includes('http')) {
-                    const urls = student.fileUrl.toString().split(',');
-                    fileLinkHtml = urls.map((url, index) => `<a href="${url.trim()}" target="_blank" class="inline-flex items-center text-blue-600 hover:underline text-sm mr-2 mb-1">查看檔案 ${urls.length > 1 ? index + 1 : ''}</a>`).join('');
-                } else if (student.fileUrl) {
-                     fileLinkHtml = `<span class="text-sm text-gray-600">${student.fileUrl}</span>`;
+                if (result.success) {
+                    classSelect.innerHTML = '<option value="">請選擇班級</option>';
+                    result.data.forEach(className => {
+                        const option = document.createElement('option');
+                        option.value = className;
+                        option.textContent = className;
+                        classSelect.appendChild(option);
+                    });
+                    
+                    classSelect.disabled = false;
+                    queryBtn.disabled = false;
+                    statusMessage.textContent = '班級載入完成，請選擇班級並點擊查詢。';
+                } else {
+                    statusMessage.innerHTML = `<span class="text-red-500">後端錯誤：${result.error}</span>`;
                 }
-                rowHtml += `<td class="px-6 py-4 whitespace-nowrap">${fileLinkHtml}</td>`;
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                statusMessage.innerHTML = '<span class="text-red-500">連線失敗！請按 F12 檢查 Console 是否有 CORS 錯誤。</span>';
+            }
+        };
+
+        // 點擊查詢按鈕的動作
+        async function queryData() {
+            const selectedClass = classSelect.value;
+            if (!selectedClass) {
+                alert('請先選擇班級！');
+                return;
             }
 
-            tr.innerHTML = rowHtml;
-            tbody.appendChild(tr);
-        });
-    }
+            // 進入載入狀態
+            queryBtn.disabled = true;
+            queryBtn.textContent = '查詢中...';
+            statusMessage.innerHTML = '<span class="text-blue-500">資料查詢中，請稍候...</span>';
+            resultContainer.classList.add('hidden');
+            resultBody.innerHTML = '';
 
-    function showError(errorMsg) {
-        document.getElementById('loadingIndicator').classList.add('hidden');
-        document.getElementById('dataContainer').classList.add('hidden');
-        document.getElementById('errorMessage').classList.remove('hidden');
-        document.getElementById('errorText').textContent = errorMsg;
-    }
-</script>
+            try {
+                const response = await fetch(`${SCRIPT_URL}?action=query&className=${encodeURIComponent(selectedClass)}`);
+                const result = await response.json();
+
+                if (result.success) {
+                    renderTable(result.data);
+                    statusMessage.textContent = `顯示 ${selectedClass} 的查詢結果。`;
+                    resultContainer.classList.remove('hidden');
+                } else {
+                    statusMessage.innerHTML = `<span class="text-red-500">查詢失敗：${result.error}</span>`;
+                }
+            } catch (error) {
+                console.error("Fetch Error:", error);
+                statusMessage.innerHTML = '<span class="text-red-500">連線發生錯誤，請稍後再試。</span>';
+            } finally {
+                queryBtn.disabled = false;
+                queryBtn.textContent = '查詢繳交狀態';
+            }
+        }
+
+        // 將資料渲染成表格
+        function renderTable(dataList) {
+            dataList.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50";
+
+                // 狀態標籤樣式
+                const statusHtml = item.isSubmitted 
+                    ? `<span class="px-2 py-1 bg-green-100 text-green-700 text-sm rounded-full font-bold">已交</span>`
+                    : `<span class="px-2 py-1 bg-red-100 text-red-700 text-sm rounded-full font-bold">未交</span>`;
+
+                // 檔案連結樣式
+                const fileHtml = item.fileUrl 
+                    ? `<a href="${item.fileUrl}" target="_blank" class="text-blue-500 hover:underline">查看檔案</a>`
+                    : `<span class="text-gray-400">-</span>`;
+                
+                // 時間格式化
+                const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleString('zh-TW', {hour12: false}) : '-';
+
+                tr.innerHTML = `
+                    <td class="p-3">${item.seatNo}</td>
+                    <td class="p-3 font-medium">${item.name}</td>
+                    <td class="p-3 text-center">${statusHtml}</td>
+                    <td class="p-3 text-center text-sm text-gray-500">${timeStr}</td>
+                    <td class="p-3 text-center">${fileHtml}</td>
+                `;
+                resultBody.appendChild(tr);
+            });
+        }
+    </script>
 </body>
 </html>
